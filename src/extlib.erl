@@ -47,3 +47,16 @@ module_attributes(Module) ->
 		V
     end.
 
+list_subtract(LeftList, RightList) ->
+    LeftSet = ordsets:from_list(LeftList),
+    RightSet = ordsets:from_list(RightList),
+    ordsets:subtract(LeftSet, RightSet).
+
+list_compare(LeftList, RightList) ->
+    LeftSet = ordsets:from_list(LeftList),
+    RightSet = ordsets:from_list(RightList),
+    Inter = ordsets:intersection(LeftSet, RightSet),
+    Left = ordsets:subtract(LeftSet, Inter),
+    Right = ordsets:subtract(RightSet, Inter),
+    {Left, Inter, Right}.
+
