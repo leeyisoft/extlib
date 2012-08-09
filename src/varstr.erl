@@ -28,7 +28,7 @@ val(Token, _VarList) ->
         Token.
 
 eval(VarStr, VarList, '$') ->
-    join([val2(Token, VarList) || Token <- scan(VarStr)], "").
+    string:join([val2(Token, VarList) || Token <- scan(VarStr)], "").
 
 val2("$"++_ = Token, VarList) ->
 	str(proplists:get_value(list_to_atom(Token), VarList, Token));
