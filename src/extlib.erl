@@ -2,6 +2,26 @@
 
 -compile(export_all).
 
+slice(Len, List) ->
+	slice(Len, List, []).
+
+slice(_Len, [], Acc) ->
+	lists:reverse(Acc);
+
+slice(Len, List, Acc) when length(List) =< Len ->
+	lists:reverse([List|Acc]);
+
+slice(Len, List, Acc) when length(List) > Len ->
+	{L1, L2} = lists:split(Len, List),
+	slice(Len, L2, [L1|Acc]).
+
+appvsn() ->
+    {ok, App} = application:get_application(),
+    case application:get_key(App, vsn) of
+    {ok, Vsn} -> Vsn;
+    undefined -> "unknown"
+    end.
+
 %copy from rabbitmq
 module_with_attrs(App, Name) ->
 	case application:get_key(App, modules) of
@@ -26,4 +46,17 @@ module_attributes(Module) ->
 	V ->
 		V
     end.
+
+list_subtract(LeftList, RightList) ->
+    LeftSet = ordsets:from_list(LeftList),
+    RightSet = ordsets:from_list(RightList),
+    ordsets:subtract(LeftSet, RightSet).
+
+list_compare(LeftList, RightList) ->
+    LeftSet = ordsets:from_list(LeftList),
+    RightSet = ordsets:from_list(RightList),
+    Inter = ordsets:intersection(LeftSet, RightSet),
+    Left = ordsets:subtract(LeftSet, Inter),
+    Right = ordsets:subtract(RightSet, Inter),
+    {Left, Inter, Right}.
 
