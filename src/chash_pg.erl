@@ -9,7 +9,7 @@
 %%%----------------------------------------------------------------------
 -module(chash_pg).
 
--export([create/1, delete/1, join/2, join/3, leave/2]).
+-export([create/1, delete/1, join/2, join/3, join/4, leave/2]).
 
 -export([which_groups/0, 
          get_local_vnodes/1, 
@@ -79,6 +79,10 @@ join(Name, Pid) when is_pid(Pid) ->
     join(Name, Pid, ?VNODES_NUM).
 
 join(Name, Pid, VNodeNum) when is_pid(Pid) ->
+    join(Name, Pid, undefined, VNodeNum).
+
+join(Name, Pid, PName, VNodeNum) 
+    when is_pid(Pid) and is_atom(PName) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
 	[] ->
@@ -87,7 +91,7 @@ join(Name, Pid, VNodeNum) when is_pid(Pid) ->
 	    global:trans({{?MODULE, Name}, self()},
 			 fun() ->
 				 gen_server:multi_call(?MODULE,
-						       {join, Name, Pid, VNodeNum})
+						       {join, Name, Pid, PName, VNodeNum})
 			 end),
 	    ok
     end.
@@ -174,10 +178,10 @@ handle_call({create, Name}, _From, S) ->
     end,
     {reply, ok, S};
 
-handle_call({join, Name, Pid, VNodeNum}, _From, S) ->
+handle_call({join, Name, Pid, PName, VNodeNum}, _From, S) ->
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
 	[{_, VNodes}] ->
-        NewVNodes = create_vnodes(Pid, VNodeNum),
+        NewVNodes = create_vnodes(Pid, PName, VNodeNum),
 	    ets:insert(chash_pg_table, {{vnodes, Name}, add_vnodes(NewVNodes, VNodes)}),
 	    NewLinks =
 		if
@@ -293,13 +297,19 @@ find_vnode(Hash, [{Key, _, _} | T])
 find_vnode(_Hash, []) ->
     false.
 
-create_vnodes(Pid, VNodeNum) when is_pid(Pid) ->
+create_vnodes(Pid, PName, VNodeNum) when is_pid(Pid) ->
     Node = node(Pid),
     lists:map(fun(I) -> 
                 [_|XY] = string:tokens(pid_to_list(Pid), "."),
+                PName1 =
+                if PName == undefined ->
+                    string:join(XY, ".");
+                true ->
+                    atom_to_list(PName)
+                end,
                 Key = chash:hash(lists:concat([
                         atom_to_list(Node), 
-                        string:join(XY, "."), 
+                        PName1, 
                         integer_to_list(I)])),
                 {Key, Pid, I}
               end, lists:seq(1, VNodeNum)).
