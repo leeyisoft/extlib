@@ -5,26 +5,26 @@
 %%% Created : 24 Dec 2009
 %%% License : http://www.opengoss.com
 %%%
-%%% Copyright (C) 2007-2009, www.opengoss.com 
+%%% Copyright (C) 2007-2009, www.opengoss.com
 %%%----------------------------------------------------------------------
 -module(chash_pg).
 
 -export([create/1, delete/1, join/2, join/3, join/4, leave/2]).
 
--export([which_groups/0, 
-         get_local_vnodes/1, 
-         get_vnodes/1, 
+-export([which_groups/0,
+         get_local_vnodes/1,
+         get_vnodes/1,
          get_vnode/2,
          get_pids/1,
          get_pid/2]).
 
 -export([start/0, start_link/0]).
 
--export([init/1, 
-         handle_call/3, 
-         handle_cast/2, 
-         handle_info/2, 
-         terminate/2, 
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
          code_change/3]).
 
 
@@ -33,8 +33,8 @@
 -define(VNODES_NUM, 40).
 
 %%%-----------------------------------------------------------------
-%%% This module implements distributed process groups based on consistent 
-%%% hash algorithm, in a different way than the module pg2.  
+%%% This module implements distributed process groups based on consistent
+%%% hash algorithm, in a different way than the module pg2.
 %%%-----------------------------------------------------------------
 %%% API
 %%%-----------------------------------------------------------------
@@ -81,7 +81,7 @@ join(Name, Pid) when is_pid(Pid) ->
 join(Name, Pid, VNodeNum) when is_pid(Pid) ->
     join(Name, Pid, undefined, VNodeNum).
 
-join(Name, Pid, PName, VNodeNum) 
+join(Name, Pid, PName, VNodeNum)
     when is_pid(Pid) and is_atom(PName) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
@@ -113,24 +113,24 @@ leave(Name, Pid) when is_pid(Pid) ->
 get_local_vnodes(Name) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {local_vnodes, Name}) of
-	[] -> 
+	[] ->
         {error, {no_such_group, Name}};
-	[{_, VNodes}] -> 
+	[{_, VNodes}] ->
         VNodes
     end.
-    
+
 get_vnodes(Name) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
-	[] -> 
+	[] ->
         {error, {no_such_group, Name}};
-	[{_, VNodes}] -> 
+	[{_, VNodes}] ->
         VNodes
     end.
 
 get_vnode(Name, Key) ->
     case get_vnodes(Name) of
-    [] -> 
+    [] ->
         {error, {no_process, Name}};
     [H|_] = VNodes ->
         Hash = chash:hash(extbif:to_list(Key)),
@@ -144,7 +144,7 @@ get_vnode(Name, Key) ->
 
 get_pids(Name) ->
     VNodes = get_vnodes(Name),
-    Pids = [Pid || {_, Pid, _} <- VNodes], 
+    Pids = [Pid || {_, Pid, _} <- VNodes],
     lists:usort(Pids).
 
 get_pid(Name, Key) ->
@@ -225,7 +225,7 @@ handle_call({leave, Name, Pid}, _From, S) ->
         [] ->
             {reply, no_such_group, S}
     end;
- 
+
 handle_call({delete, Name}, _From, S) ->
     ets:delete(chash_pg_table, {local_vnodes, Name}),
     ets:delete(chash_pg_table, {vnodes, Name}),
@@ -241,7 +241,7 @@ handle_cast({delete_vnode, Name, Pid}, S) ->
 
 handle_info({'EXIT', Pid, _}, S) ->
     Records = ets:match(chash_pg_table, {{local_vnodes, '$1'}, '$2'}),
-    lists:foreach(fun([Name, VNodes]) -> 
+    lists:foreach(fun([Name, VNodes]) ->
         lists:foreach(
             fun({_Key, Pid2, _Vid} = VNode) when Pid =:= Pid2 ->
                 delete_vnode(vnodes, Name, VNode),
@@ -264,8 +264,8 @@ handle_info({new_chash_pg, Node}, S) ->
 
 handle_info({nodedown, Node}, S) ->
     Records = ets:match(chash_pg_table, {{vnodes, '$1'}, '$2'}),
-    lists:foreach(fun([Name, VNodes]) -> 
-        NewVNodes = lists:filter( 
+    lists:foreach(fun([Name, VNodes]) ->
+        NewVNodes = lists:filter(
             fun({_Key, Pid, _Vid}) when node(Pid) =:= Node -> false;
                (_) -> true
             end, VNodes),
@@ -286,11 +286,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%%-----------------------------------------------------------------
 %%% Internal functions
 %%%-----------------------------------------------------------------
-find_vnode(Hash, [{Key, _, _} = VNode | _]) 
+find_vnode(Hash, [{Key, _, _} = VNode | _])
     when Hash =< Key ->
     {ok, VNode};
 
-find_vnode(Hash, [{Key, _, _} | T]) 
+find_vnode(Hash, [{Key, _, _} | T])
     when Hash > Key ->
     find_vnode(Hash, T);
 
@@ -299,7 +299,7 @@ find_vnode(_Hash, []) ->
 
 create_vnodes(Pid, PName, VNodeNum) when is_pid(Pid) ->
     Node = node(Pid),
-    lists:map(fun(I) -> 
+    lists:map(fun(I) ->
                 [_|XY] = string:tokens(pid_to_list(Pid), "."),
                 PName1 =
                 if PName == undefined ->
@@ -308,8 +308,8 @@ create_vnodes(Pid, PName, VNodeNum) when is_pid(Pid) ->
                     atom_to_list(PName)
                 end,
                 Key = chash:hash(lists:concat([
-                        atom_to_list(Node), 
-                        PName1, 
+                        atom_to_list(Node),
+                        PName1,
                         integer_to_list(I)])),
                 {Key, Pid, I}
               end, lists:seq(1, VNodeNum)).
@@ -331,8 +331,8 @@ delete_vnode(VNode, VNodes) ->
     lists:delete(VNode, VNodes).
 
 delete_vnodes(Pid, VNodes) when is_pid(Pid) ->
-    lists:filter(fun({_Key, Pid2, _Vid}) when Pid2 =:= Pid -> false; 
-                    (_) -> true 
+    lists:filter(fun({_Key, Pid2, _Vid}) when Pid2 =:= Pid -> false;
+                    (_) -> true
                  end, VNodes).
 
 
@@ -343,7 +343,7 @@ delete([], _) -> [].
 
 store([[Name, VNodes] | T], Node) ->
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
-	[] -> 
+	[] ->
 	    ets:insert(chash_pg_table, {{vnodes, Name}, VNodes}),
 	    % We can't have any local vnodes, since the group is new to us!
 	    ets:insert(chash_pg_table, {{local_vnodes, Name}, []});
