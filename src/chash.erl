@@ -5,7 +5,7 @@
 %%% Created : 24 Dec 2009
 %%% License : http://www.opengoss.com
 %%%
-%%% Copyright (C) 2007-2009, www.opengoss.com 
+%%% Copyright (C) 2007-2009, www.opengoss.com
 %%%----------------------------------------------------------------------
 -module(chash).
 
@@ -13,7 +13,7 @@
 
 %% @doc hash
 hash(String) when is_list(String) ->
-    <<Hash:160>> = crypto:sha(String), %sha1:binstring(String),
+    <<Hash:160>> = crypto:hash(sha, String), %sha1:binstring(String),
     Hash.
 
 max() ->

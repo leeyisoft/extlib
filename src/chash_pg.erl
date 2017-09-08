@@ -47,32 +47,32 @@ start() ->
 which_groups() ->
     ensure_started(),
     ets:filter(chash_pg_table,
-	       fun([{{vnodes, Group}, _}]) ->
-		       {true, Group};
-		  (_) ->
-		       false
-	       end,
-	       []).
+           fun([{{vnodes, Group}, _}]) ->
+               {true, Group};
+          (_) ->
+               false
+           end,
+           []).
 
 create(Name) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {local_vnodes, Name}) of
-	[] ->
-	    global:trans({{?MODULE, Name}, self()},
-			 fun() ->
-				 gen_server:multi_call(?MODULE, {create, Name})
-			 end);
-	_ ->
-	    ok
+    [] ->
+        global:trans({{?MODULE, Name}, self()},
+             fun() ->
+                 gen_server:multi_call(?MODULE, {create, Name})
+             end);
+    _ ->
+        ok
     end,
     ok.
 
 delete(Name) ->
     ensure_started(),
     global:trans({{?MODULE, Name}, self()},
-		 fun() ->
-			 gen_server:multi_call(?MODULE, {delete, Name})
-		 end),
+         fun() ->
+             gen_server:multi_call(?MODULE, {delete, Name})
+         end),
     ok.
 
 join(Name, Pid) when is_pid(Pid) ->
@@ -85,15 +85,15 @@ join(Name, Pid, PName, VNodeNum)
     when is_pid(Pid) and is_atom(PName) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
-	[] ->
-	    {error, {no_such_group, Name}};
-	_ ->
-	    global:trans({{?MODULE, Name}, self()},
-			 fun() ->
-				 gen_server:multi_call(?MODULE,
-						       {join, Name, Pid, PName, VNodeNum})
-			 end),
-	    ok
+    [] ->
+        {error, {no_such_group, Name}};
+    _ ->
+        global:trans({{?MODULE, Name}, self()},
+             fun() ->
+                 gen_server:multi_call(?MODULE,
+                               {join, Name, Pid, PName, VNodeNum})
+             end),
+        ok
     end.
 
 leave(Name, Pid) when is_pid(Pid) ->
@@ -113,18 +113,18 @@ leave(Name, Pid) when is_pid(Pid) ->
 get_local_vnodes(Name) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {local_vnodes, Name}) of
-	[] ->
+    [] ->
         {error, {no_such_group, Name}};
-	[{_, VNodes}] ->
+    [{_, VNodes}] ->
         VNodes
     end.
 
 get_vnodes(Name) ->
     ensure_started(),
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
-	[] ->
+    [] ->
         {error, {no_such_group, Name}};
-	[{_, VNodes}] ->
+    [{_, VNodes}] ->
         VNodes
     end.
 
@@ -161,41 +161,41 @@ init([]) ->
     Ns = nodes(),
     net_kernel:monitor_nodes(true),
     lists:foreach(fun(N) ->
-			  {?MODULE, N} ! {new_chash_pg, node()},
-			  self() ! {nodeup, N}
-		  end, Ns),
+              {?MODULE, N} ! {new_chash_pg, node()},
+              self() ! {nodeup, N}
+          end, Ns),
     % chash_pg_table keeps track of all vnodesin a group
     ets:new(chash_pg_table, [set, protected, named_table]),
     {ok, #state{}}.
 
 handle_call({create, Name}, _From, S) ->
     case ets:lookup(chash_pg_table, {local_vnodes, Name}) of
-	[] ->
-	    ets:insert(chash_pg_table, {{local_vnodes, Name}, []}),
-	    ets:insert(chash_pg_table, {{vnodes, Name}, []});
-	_ ->
-	    ok
+    [] ->
+        ets:insert(chash_pg_table, {{local_vnodes, Name}, []}),
+        ets:insert(chash_pg_table, {{vnodes, Name}, []});
+    _ ->
+        ok
     end,
     {reply, ok, S};
 
 handle_call({join, Name, Pid, PName, VNodeNum}, _From, S) ->
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
-	[{_, VNodes}] ->
+    [{_, VNodes}] ->
         NewVNodes = create_vnodes(Pid, PName, VNodeNum),
-	    ets:insert(chash_pg_table, {{vnodes, Name}, add_vnodes(NewVNodes, VNodes)}),
-	    NewLinks =
-		if
-		    node(Pid) =:= node() ->
+        ets:insert(chash_pg_table, {{vnodes, Name}, add_vnodes(NewVNodes, VNodes)}),
+        NewLinks =
+        if
+            node(Pid) =:= node() ->
                 link(Pid),
                 [{_, LocalVNodes}] = ets:lookup(chash_pg_table, {local_vnodes, Name}),
                 ets:insert(chash_pg_table, {{local_vnodes, Name}, add_vnodes(NewVNodes, LocalVNodes)}),
                 [Pid | S#state.links];
-		    true ->
+            true ->
                 S#state.links
-		end,
-	    {reply, ok, S#state{links = NewLinks}};
-	[] ->
-	    {reply, no_such_group, S}
+        end,
+        {reply, ok, S#state{links = NewLinks}};
+    [] ->
+        {reply, no_such_group, S}
     end;
 
 handle_call({leave, Name, Pid}, _From, S) ->
@@ -343,13 +343,13 @@ delete([], _) -> [].
 
 store([[Name, VNodes] | T], Node) ->
     case ets:lookup(chash_pg_table, {vnodes, Name}) of
-	[] ->
-	    ets:insert(chash_pg_table, {{vnodes, Name}, VNodes}),
-	    % We can't have any local vnodes, since the group is new to us!
-	    ets:insert(chash_pg_table, {{local_vnodes, Name}, []});
-	[{Key, VNodes2}] ->
-	    NInst = lists:keysort(1, union(VNodes, VNodes2)),
-	    ets:insert(chash_pg_table, {Key, NInst})
+    [] ->
+        ets:insert(chash_pg_table, {{vnodes, Name}, VNodes}),
+        % We can't have any local vnodes, since the group is new to us!
+        ets:insert(chash_pg_table, {{local_vnodes, Name}, []});
+    [{Key, VNodes2}] ->
+        NInst = lists:keysort(1, union(VNodes, VNodes2)),
+        ets:insert(chash_pg_table, {Key, NInst})
     end,
     store(T, Node);
 store([], _Node) ->
@@ -363,12 +363,12 @@ all_vnodes() ->
 
 ensure_started() ->
     case whereis(?MODULE) of
-	undefined ->
-	    C = {chash_pg, {?MODULE, start_link, []}, permanent,
-		 1000, worker, [?MODULE]},
-	    supervisor:start_child(extlib_sup, C);
-	Pid ->
-	    {ok, Pid}
+    undefined ->
+        C = {chash_pg, {?MODULE, start_link, []}, permanent,
+         1000, worker, [?MODULE]},
+        supervisor:start_child(extlib_sup, C);
+    Pid ->
+        {ok, Pid}
     end.
 
 
